@@ -553,7 +553,7 @@ def predict_traffic_flow_with_llm(history_data, channel_name, predict_hours=72, 
             h = i % 24
             median_val = hist_hour_median.get(h, base_mean)
             if abs(predictions[i] - median_val) > 0.3 * median_val:
-                predictions[i] = int(0.7 * predictions[i] + 0.3 * median_val)
+                predictions[i] = int(0.9 * predictions[i] + 0.1 * median_val)
 
         # 重新裁剪到安全区间
         predictions = [max(flow_min, min(flow_max, int(round(v)))) for v in predictions]
