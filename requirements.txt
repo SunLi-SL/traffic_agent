@@ -4,3 +4,10 @@ pandas
 folium
 matplotlib
 requests
+plotly
+altair
+scikit-learn
+statsmodels
+dashscope
+geopandas
+shapely
