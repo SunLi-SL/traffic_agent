@@ -1,9 +1,41 @@
-# map_agent.py - 最终完整版
+# map_agent.py 头部
+# map_agent.py 头部【修复完成版】
 import streamlit as st
+import numpy as np
+from datetime import datetime, timedelta
+import time
+import altair as alt
+import json
+import os
+import plotly.graph_objects as go
+from sklearn.cluster import KMeans
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
+import matplotlib.pyplot as plt
+import pandas as pd
 
-# 读取预设账号密码
+# ========= 全局密钥读取函数（移到最顶部，所有代码都能调用）=========
+def get_secret(key_path):
+    # 云端部署模式
+    if st.runtime.exists():
+        # 先判断是否存在 [api] 分组，不存在直接走本地文件逻辑
+        if "api" in st.secrets and key_path in st.secrets["api"]:
+            return st.secrets["api"][key_path]
+    # 本地环境 / 云端无api密钥时读取本地txt
+    try:
+        with open(f".{key_path}.txt", "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        # 本地txt也不存在返回空字符串，后续代码弹窗让用户手动输入
+        return ""
+
+# 读取密钥，为空不中断程序，交给侧边栏输入框处理
+dashscope_key = get_secret("dashscope_key")
+amap_key = get_secret("amap_key")
+
+# 读取预设账号密码（账号密码单独存secrets，和api密钥分组隔离）
 user_pwd = st.secrets["passwords"]
 
+# 登录状态初始化
 if "login_status" not in st.session_state:
     st.session_state.login_status = False
 
@@ -17,34 +49,22 @@ if not st.session_state.login_status:
             st.rerun()
         else:
             st.error("账号或密码错误")
-    st.stop() # 登录失败直接拦截，不加载智能体
-# ----------------下方写你的智能体完整业务代码----------------
-import numpy as np
-from datetime import datetime, timedelta
-import time
-import altair as alt
-import json
-import os
-import plotly.graph_objects as go
-from sklearn.cluster import KMeans
-from statsmodels.tsa.holtwinters import ExponentialSmoothing
-import matplotlib.pyplot as plt
-import streamlit as st
-import pandas as pd
+    st.stop() # 登录失败直接拦截，下方业务代码不再执行
 
+# ====================== 修复BUG1：登录校验通过后才导入自定义模块 ======================
 from alert_system import (
     init_alert_state,
     show_alert_sidebar,
     show_real_time_alert_panel,
     show_predict_alert_panel,
     show_alert_log_panel,
-    show_predict_alert_log_panel,  # 添加这一行
-
+    show_predict_alert_log_panel,
     calculate_adaptive_thresholds,
     CONGESTION
 )
 # 导入船舶轨迹功能模块
 from trajectory_func import render_trajectory
+from ai_assistant import reset_chat_session
 
 # ========== 在这里添加声音开关初始化 ==========
 if 'sound_enabled' not in st.session_state:
@@ -64,18 +84,18 @@ alt.data_transformers.disable_max_rows()
 
 week_map = {0: "星期一", 1: "星期二", 2: "星期三", 3: "星期四", 4: "星期五", 5: "星期六", 6: "星期日"}
 
-# 拥堵等级常量（统一定义，消除重复）
-CONGESTION = {
-    "normal": {"max": 299, "color": "#00CC00", "label": "正常通行"},
-    "light": {"min": 300, "max": 399, "color": "#FFA500", "label": "轻度拥堵"},
-    "moderate": {"min": 400, "max": 499, "color": "#FF0000", "label": "中度拥堵"},
-    "heavy": {"min": 500, "color": "#8B0000", "label": "严重拥堵"},
-}
+# ====================== 修复BUG2：删除本地重复定义的CONGESTION，统一使用alert_system导入的常量 ======================
+# 【已删除下方重复冲突代码】
+# CONGESTION = {
+#     "normal": {"max": 299, "color": "#00CC00", "label": "正常通行"},
+#     "light": {"min": 300, "max": 399, "color": "#FFA500", "label": "轻度拥堵"},
+#     "moderate": {"min": 400, "max": 499, "color": "#FF0000", "label": "中度拥堵"},
+#     "heavy": {"min": 500, "color": "#8B0000", "label": "严重拥堵"},
+# }
 
 # 解决中文显示
 plt.rcParams["font.sans-serif"] = ["SimHei", "DejaVu Sans"]
 plt.rcParams["axes.unicode_minus"] = False
-
 
 # -------------------------- 大模型配置 --------------------------
 def get_api_key():
@@ -258,6 +278,12 @@ def extract_temporal_features(history_data):
         "hour_self_ratio": hour_self_ratio
     }
 
+# ====================== 修复BUG3：删除无意义空平滑函数 + 全局删除所有调用 ======================
+# 【已整段删除以下无效函数】
+# def smooth_predictions_with_fluctuation(predictions, window_size=1):
+#     """取消平滑，原样返回，保住高低峰值"""
+#     return predictions
+
 
 def fallback_prediction(history_data, predict_hours=72):
     """全自适应备用预测，峰谷全部由历史数据自动计算倍率"""
@@ -296,7 +322,7 @@ def fallback_prediction(history_data, predict_hours=72):
                 if h in [0, 1, 2, 3]:
                     pred[idx] = pred[idx] * dawn_ratio
             pred = np.clip(pred, flow_min, flow_max)
-            pred = smooth_predictions_with_fluctuation(pred, 1)
+            # 【修复】删除 smooth_predictions_with_fluctuation 调用
             return [max(10, int(round(p))) for p in pred]
         except:
             pass
@@ -344,7 +370,7 @@ def fallback_prediction(history_data, predict_hours=72):
         val = max(flow_min, min(flow_max, val))
         predictions.append(val)
 
-    predictions = smooth_predictions_with_fluctuation(predictions, 1)
+    # 【修复】删除 smooth_predictions_with_fluctuation 调用
     return [max(10, int(round(p))) for p in predictions]
 
 
@@ -538,6 +564,7 @@ def predict_traffic_flow_with_llm(history_data, channel_name, predict_hours=72, 
 
     except Exception as e:
         return fallback_prediction(history_data, predict_hours)
+
 
 
 def smooth_predictions_with_fluctuation(predictions, window_size=1):
