@@ -1,0 +1,31 @@
+# 1. 关键：屏蔽账号密码/密钥文件夹（必写，防止泄露登录密码、API Key）
+.streamlit/
+
+# 2. 本地保存的千问、高德密钥文本文件
+.dashscope_key.txt
+dashscope_key.txt
+.amap_key.txt
+
+# 3. Python 编译缓存文件
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 4. Streamlit 运行缓存、会话缓存
+.streamlit/cache/
+.streamlit/.*.cache
+
+# 5. 临时数据、日志文件
+*.log
+temp/
+cache/
+output_temp/
+
+# 6. 上传的本地CSV演示数据（可选，不想上传数据就保留）
+*.csv
+!demo_sample.csv
+
+# 7. 系统无关文件
+.DS_Store
+Thumbs.db
