@@ -99,19 +99,18 @@ plt.rcParams["axes.unicode_minus"] = False
 
 # -------------------------- 大模型配置 --------------------------
 def get_api_key():
-    try:
-        if "dashscope_api_key" in st.secrets:
-            return st.secrets["dashscope_api_key"]
-    except Exception:
-        pass
+    # 优先读取顶部全局变量（云端secrets [api]分组已经加载好）
+    global dashscope_key
+    if dashscope_key and dashscope_key.strip() != "":
+        return dashscope_key.strip()
 
+    # 下面是原有本地文件/环境变量兜底逻辑，完全保留，不影响本地使用
     key_paths = [
         ".dashscope_key.txt",
         "dashscope_key.txt",
         os.path.expanduser("~/.dashscope_key.txt"),
         os.path.join(os.path.dirname(__file__), ".dashscope_key.txt")
     ]
-
     for key_path in key_paths:
         if os.path.exists(key_path):
             try:
@@ -121,16 +120,12 @@ def get_api_key():
                         return key
             except Exception:
                 continue
-
     api_key = os.environ.get("DASHSCOPE_API_KEY", "")
     if api_key:
         return api_key
-
     if "dashscope_api_key" in st.session_state:
         return st.session_state["dashscope_api_key"]
-
     return ""
-
 
 def save_api_key(key):
     if not key:
@@ -603,20 +598,18 @@ def calc_heatmap_data(df):
 
 # -------------------------- 高德地图Key管理 --------------------------
 def get_amap_key():
-    try:
-        if "amap_key" in st.secrets:
-            return st.secrets["amap_key"]
-    except Exception:
-        pass
+    # 优先读取顶部全局变量（云端secrets [api]分组）
+    global amap_key
+    if amap_key and amap_key.strip() != "":
+        return amap_key.strip()
 
+    # 原有本地txt兼容逻辑保留
     secrets_path = ".amap_key.txt"
     if os.path.exists(secrets_path):
         with open(secrets_path, "r") as f:
             return f.read().strip()
-
     if "amap_key" in st.session_state:
         return st.session_state["amap_key"]
-
     return ""
 
 
