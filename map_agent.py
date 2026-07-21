@@ -84,14 +84,6 @@ alt.data_transformers.disable_max_rows()
 
 week_map = {0: "星期一", 1: "星期二", 2: "星期三", 3: "星期四", 4: "星期五", 5: "星期六", 6: "星期日"}
 
-# ====================== 修复BUG2：删除本地重复定义的CONGESTION，统一使用alert_system导入的常量 ======================
-# 【已删除下方重复冲突代码】
-# CONGESTION = {
-#     "normal": {"max": 299, "color": "#00CC00", "label": "正常通行"},
-#     "light": {"min": 300, "max": 399, "color": "#FFA500", "label": "轻度拥堵"},
-#     "moderate": {"min": 400, "max": 499, "color": "#FF0000", "label": "中度拥堵"},
-#     "heavy": {"min": 500, "color": "#8B0000", "label": "严重拥堵"},
-# }
 
 # 解决中文显示
 plt.rcParams["font.sans-serif"] = ["SimHei", "DejaVu Sans"]
@@ -273,11 +265,6 @@ def extract_temporal_features(history_data):
         "hour_self_ratio": hour_self_ratio
     }
 
-# ====================== 修复BUG3：删除无意义空平滑函数 + 全局删除所有调用 ======================
-# 【已整段删除以下无效函数】
-# def smooth_predictions_with_fluctuation(predictions, window_size=1):
-#     """取消平滑，原样返回，保住高低峰值"""
-#     return predictions
 
 
 def fallback_prediction(history_data, predict_hours=72):
@@ -693,7 +680,7 @@ def generate_demo_data():
     np.random.seed(42)
 
     channels = {
-        "channel_A": {"lat_range": (38.95, 39.00), "lon_range": (117.65, 117.70), "color": "#5470c6"},
+        "channel_A": {"lat_range": (38.95, 39.00), "lon_range": (117.65, 117.70), "color": "#3690e8"},
         "channel_B": {"lat_range": (38.90, 38.95), "lon_range": (117.70, 117.75), "color": "#7cb5ec"},
         "channel_C": {"lat_range": (38.85, 38.90), "lon_range": (117.75, 117.80), "color": "#f44336"}
     }
@@ -1661,6 +1648,11 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("### 🗺️ 高德地图设置")
+
+
+
+
+
     amap_key = get_amap_key()
     if not amap_key:
         st.warning("⚠️ 请输入高德地图Key")
@@ -1680,51 +1672,46 @@ with st.sidebar:
 
         st.markdown("---")
         with st.expander("📊 拥堵分级标准", expanded=True):
-            # 检查是否有数据加载，并且有选中的航道
+            # 固定兜底阈值
+            fixed_light = 200
+            fixed_moderate = 300
+            fixed_heavy = 400
+            # 标记是否使用自适应
+            use_auto = False
+            thresholds = None
+
             if st.session_state.data_loaded and 'channel_option' in st.session_state:
                 try:
-                    # 🚨 修复：每次渲染侧边栏，重新读取当前统一航道，实时重算自适应阈值
                     selected_channel = st.session_state.channel_option
                     df_temp = st.session_state.df
+                    # 修复1：增加 == 筛选当前选中航道
                     df_channel = df_temp[df_temp['channel_id'] == selected_channel]
-                    if len(df_channel) > 0:
-                        history_flow = df_channel['traffic_flow'].tolist()
-                        # 计算自适应阈值
+                    history_flow = df_channel['traffic_flow'].tolist()
+                    if len(history_flow) > 0:
                         thresholds = calculate_adaptive_thresholds(history_flow, selected_channel)
-
-                        st.markdown(f"**📍 当前航道：{selected_channel}**")
-                        st.success(f"✅ 正常通行：0 ~ {thresholds['light'] - 1} 艘/小时")
-                        st.info(f"🔷 轻度拥堵：{thresholds['light']} ~ {thresholds['moderate'] - 1} 艘/小时")
-                        st.warning(f"⚠️ 中度拥堵：{thresholds['moderate']} ~ {thresholds['heavy'] - 1} 艘/小时")
-                        st.error(f"🔴 严重拥堵：≥ {thresholds['heavy']} 艘/小时")
-                        st.caption(f"📊 基于历史数据动态计算（70%/85%/95%分位数）")
+                        use_auto = True
                     else:
-                        # 该航道无历史数据，显示固定默认值
-                        st.markdown(f"**📍 当前航道：{selected_channel}（无历史数据）**")
-                        st.success(f"✅ {CONGESTION['normal']['label']}：0 ~ {CONGESTION['normal']['max']} 艘/小时")
-                        st.info(
-                            f"🔷 {CONGESTION['light']['label']}：{CONGESTION['light']['min']} ~ {CONGESTION['light']['max']} 艘/小时")
-                        st.warning(
-                            f"⚠️ {CONGESTION['moderate']['label']}：{CONGESTION['moderate']['min']} ~ {CONGESTION['moderate']['max']} 艘/小时")
-                        st.error(f"🔴 {CONGESTION['heavy']['label']}：≥ {CONGESTION['heavy']['min']} 艘/小时")
-                        st.caption(f"⚠️ 暂无历史数据，使用默认标准")
+                        use_auto = False
                 except Exception as e:
-                    # 出错时显示固定默认值
-                    st.success(f"✅ {CONGESTION['normal']['label']}：0 ~ {CONGESTION['normal']['max']} 艘/小时")
-                    st.info(
-                        f"🔷 {CONGESTION['light']['label']}：{CONGESTION['light']['min']} ~ {CONGESTION['light']['max']} 艘/小时")
-                    st.warning(
-                        f"⚠️ {CONGESTION['moderate']['label']}：{CONGESTION['moderate']['min']} ~ {CONGESTION['moderate']['max']} 艘/小时")
-                    st.error(f"🔴 {CONGESTION['heavy']['label']}：≥ {CONGESTION['heavy']['min']} 艘/小时")
+                    use_auto = False
+
+
+            if use_auto and thresholds is not None:
+                st.markdown(f"**📍 当前航道：{selected_channel}**")
+                st.success(f"✅ 正常通行：0 ~ {thresholds['light'] - 1} 艘/小时")
+                st.info(f"🔷 轻度拥堵：{thresholds['light']} ~ {thresholds['moderate'] - 1} 艘/小时")
+                st.warning(f"⚠️ 中度拥堵：{thresholds['moderate']} ~ {thresholds['heavy'] - 1} 艘/小时")
+                st.error(f"🔴 严重拥堵：≥ {thresholds['heavy']} 艘/小时")
+                st.caption(f"📊 基于历史数据动态计算（70%/85%/95%分位数）")
             else:
-                # 未加载数据时显示固定默认值
-                st.success(f"✅ {CONGESTION['normal']['label']}：0 ~ {CONGESTION['normal']['max']} 艘/小时")
-                st.info(
-                    f"🔷 {CONGESTION['light']['label']}：{CONGESTION['light']['min']} ~ {CONGESTION['light']['max']} 艘/小时")
-                st.warning(
-                    f"⚠️ {CONGESTION['moderate']['label']}：{CONGESTION['moderate']['min']} ~ {CONGESTION['moderate']['max']} 艘/小时")
-                st.error(f"🔴 {CONGESTION['heavy']['label']}：≥ {CONGESTION['heavy']['min']} 艘/小时")
-                st.caption(f"💡 加载数据后将显示自适应标准")
+                # 无数据/计算异常，统一用固定值，不再读取 thresholds
+                st.markdown(f"**📍 当前航道：{st.session_state.get('channel_option', '未知航道')}（无历史数据/计算失败）**")
+                st.success(f"✅ 正常通行：0 ~ {fixed_light - 1} 艘/小时")
+                st.info(f"🔷 轻度拥堵：{fixed_light} ~ {fixed_moderate - 1} 艘/小时")
+                st.warning(f"⚠️ 中度拥堵：{fixed_moderate} ~ {fixed_heavy - 1} 艘/小时")
+                st.error(f"🔴 严重拥堵：≥ {fixed_heavy} 艘/小时")
+                st.caption(f"⚠️ 暂无有效历史数据，使用默认标准200/300/400")
+
         # ========== 在侧边栏结束前，追加这一行 ==========
     show_alert_sidebar()
 # -------------------------- 主页面 --------------------------
@@ -1743,9 +1730,7 @@ else:
     channels = st.session_state.channels
 
     # ===================== 自动合并天气数据 =====================
-    if weather_df is not None:
-        df = merge_weather_data(df, weather_df)
-        st.success("✅ 成功融合：AIS交通流量 + 气象数据")
+
 
     # -------------------------- 标题 --------------------------
     st.markdown('<div class="main-title">🚢 基于多源数据的港口交通流预测与示警智能体</div>', unsafe_allow_html=True)
@@ -1879,6 +1864,12 @@ else:
 
     # 开启第一个标签：包裹你所有旧页面内容
     with tab_main:
+        # ========= 新增：全局统一计算当前选中航道拥堵阈值 =========
+        df = st.session_state.df
+        light_t = 200
+        moderate_t = 300
+        heavy_t = 400
+        # ======================================================
         with st.expander("📋 原始数据预览", expanded=True):
             preview_df = df[['time', 'show_time', 'channel_id', 'traffic_flow', 'lat', 'lon']].head(100).copy()
             preview_df.index = preview_df.index + 1
@@ -1909,7 +1900,7 @@ else:
                     alt.Tooltip('channel_id:N', title='🚢 航道')
                 ]
             ).add_params(nearest)
-            hline_df = pd.DataFrame({'y': [300, 400, 500]})
+            hline_df = pd.DataFrame({'y': [light_t, moderate_t, heavy_t]})
             hlines = alt.Chart(hline_df).mark_rule(color='red', strokeDash=[8, 4]).encode(y='y:Q')
 
             trend_chart = alt.layer(area, line, points, rule, hlines).properties(height=400).interactive()
@@ -1989,7 +1980,7 @@ else:
                 valid_data['流量_带单位'] = valid_data['traffic_flow'].round(1).astype(str) + " 艘/小时"
 
                 unique_ch = sorted(valid_data["channel_id"].unique())
-                color_list = ["#5470c6", "#7cb5ec", "#f44336", "#9467bd", "#8c564b"]
+                color_list = ["#3690e8", "#7cb5ec", "#f44336", "#9467bd", "#8c564b"]
                 ch_color_map = {cid: color_list[i % len(color_list)] for i, cid in enumerate(unique_ch)}
 
                 legend_sel = alt.selection_multi(fields=["channel_id"], bind="legend")
@@ -2035,12 +2026,30 @@ else:
         # -------------------------- 高德地图 --------------------------
         st.markdown('<div class="card">', unsafe_allow_html=True)
         st.subheader("🗺️ 高德地图 · 航道通航监控")
-
         # ===================== 采样优化：每个航道固定显示50个点 =====================
         MAX_POINTS_PER_CHANNEL = 50
         TOTAL_MAX_POINTS = 500
 
         sampled_points = []
+
+        # ========= 固定阈值，和右下角图例严格统一：<200正常 /200-299轻度 /300-399中度 /≥400严重 =========
+        light_t = 200
+        moderate_t = 300
+        heavy_t = 400
+
+        # 全局统一配色与文字映射（和图例颜色一一对应）
+        COLOR_MAP = {
+            "normal": "#00CC00",
+            "light": "#3690e8",  # 标准深蓝，消除偏紫问题
+            "moderate": "#FFA500",
+            "heavy": "#ff0000"
+        }
+        LABEL_MAP = {
+            "normal": "正常通行",
+            "light": "轻度拥堵",
+            "moderate": "中度拥堵",
+            "heavy": "严重拥堵"
+        }
 
         # 1. 先收集统计信息，再用 expander 包裹
         stats_info = []
@@ -2063,23 +2072,25 @@ else:
             if len(channel_df) == 0:
                 continue
 
+            # 循环逐行判定流量颜色，严格按固定200/300/400分界
             for _, row in channel_df.iterrows():
                 flow = row['traffic_flow']
-                if flow <= CONGESTION["normal"]["max"]:
-                    color = CONGESTION["normal"]["color"]
-                    level_name = CONGESTION["normal"]["label"]
+                # 固定阈值分级，不再自适应
+                if flow < light_t:
+                    color = COLOR_MAP["normal"]
+                    level_name = LABEL_MAP["normal"]
                     level = "normal"
-                elif flow <= CONGESTION["light"]["max"]:
-                    color = CONGESTION["light"]["color"]
-                    level_name = CONGESTION["light"]["label"]
+                elif light_t <= flow < moderate_t:
+                    color = COLOR_MAP["light"]
+                    level_name = LABEL_MAP["light"]
                     level = "light"
-                elif flow <= CONGESTION["moderate"]["max"]:
-                    color = CONGESTION["moderate"]["color"]
-                    level_name = CONGESTION["moderate"]["label"]
+                elif moderate_t <= flow < heavy_t:
+                    color = COLOR_MAP["moderate"]
+                    level_name = LABEL_MAP["moderate"]
                     level = "moderate"
                 else:
-                    color = CONGESTION["heavy"]["color"]
-                    level_name = CONGESTION["heavy"]["label"]
+                    color = COLOR_MAP["heavy"]
+                    level_name = LABEL_MAP["heavy"]
                     level = "heavy"
 
                 sampled_points.append({
@@ -2123,10 +2134,41 @@ else:
             center_lat, center_lng = 38.93, 117.70
 
         amap_key = get_amap_key()
+        # 图例文字同步固定阈值，和右下角图例完全一致
+        legend_html = f'''
+        <div class="legend-item active" data-level="normal">
+            <span class="legend-color" style="background:{COLOR_MAP['normal']};"></span> {LABEL_MAP['normal']} (&lt;{light_t})
+        </div>
+        <div class="legend-item active" data-level="light">
+            <span class="legend-color" style="background:{COLOR_MAP['light']};"></span> {LABEL_MAP['light']} ({light_t}-{moderate_t - 1})
+        </div>
+        <div class="legend-item active" data-level="moderate">
+            <span class="legend-color" style="background:{COLOR_MAP['moderate']};"></span> {LABEL_MAP['moderate']} ({moderate_t}-{heavy_t - 1})
+        </div>
+        <div class="legend-item active" data-level="heavy">
+            <span class="legend-color" style="background:{COLOR_MAP['heavy']};"></span> {LABEL_MAP['heavy']} (≥{heavy_t})
+        </div>
+        '''
+
+
+
+
+
+
+
 
         if not amap_key:
             st.warning("⚠️ 请先在侧边栏配置高德地图Key，否则地图无法显示")
         else:
+            # 提前解析配色与标签，注入地图JS
+            c_normal = COLOR_MAP["normal"]
+            c_light = COLOR_MAP["light"]
+            c_moderate = COLOR_MAP["moderate"]
+            c_heavy = COLOR_MAP["heavy"]
+            lab_normal = LABEL_MAP["normal"]
+            lab_light = LABEL_MAP["light"]
+            lab_moderate = LABEL_MAP["moderate"]
+            lab_heavy = LABEL_MAP["heavy"]
             map_html = f"""
             <!DOCTYPE html>
             <html>
@@ -2204,23 +2246,16 @@ else:
         <span class="legend-toggle" id="legendToggle">▼</span>
     </div>
     <div class="legend-content" id="legendContent" style="display: block;">
-        <div class="legend-item active" data-level="normal">
-            <span class="legend-color" style="background:{CONGESTION['normal']['color']};"></span> {CONGESTION['normal']['label']} (&lt;{CONGESTION['normal']['max'] + 1})
-        </div>
-        <div class="legend-item active" data-level="light">
-            <span class="legend-color" style="background:{CONGESTION['light']['color']};"></span> {CONGESTION['light']['label']} ({CONGESTION['light']['min']}-{CONGESTION['light']['max']})
-        </div>
-        <div class="legend-item active" data-level="moderate">
-            <span class="legend-color" style="background:{CONGESTION['moderate']['color']};"></span> {CONGESTION['moderate']['label']} ({CONGESTION['moderate']['min']}-{CONGESTION['moderate']['max']})
-        </div>
-        <div class="legend-item active" data-level="heavy">
-            <span class="legend-color" style="background:{CONGESTION['heavy']['color']};"></span> {CONGESTION['heavy']['label']} (≥{CONGESTION['heavy']['min']})
-        </div>
+    {legend_html}
+    </div>
+
+
     </div>
 </div>
                 
 
                 <script>
+            
                     var infoPanel = document.getElementById('infoPanel');
                     var normalPoints = {json.dumps(normal_pts)};
                     var lightPoints = {json.dumps(light_pts)};
@@ -2278,18 +2313,12 @@ else:
                         }}
                         markerGroups[level] = group;
                     }}
-
                     map.on('complete', function() {{
-                        addMarkers(normalPoints, '{CONGESTION['normal']['color']}', 'normal', '{CONGESTION['normal']['label']}');
-                        addMarkers(lightPoints, '{CONGESTION['light']['color']}', 'light', '{CONGESTION['light']['label']}');
-                        addMarkers(moderatePoints, '{CONGESTION['moderate']['color']}', 'moderate', '{CONGESTION['moderate']['label']}');
-                        addMarkers(heavyPoints, '{CONGESTION['heavy']['color']}', 'heavy', '{CONGESTION['heavy']['label']}');
-                        infoPanel.innerHTML = '✅ 已显示 ' + allMarkers.length + ' 个航道流量点';
-                        if (allMarkers.length > 0) {{
-                            map.setFitView(allMarkers, false, [30, 30, 30, 30]);
-                        }}
-                    }});
-
+                    addMarkers(normalPoints, '{c_normal}', 'normal', '{lab_normal}');
+                    addMarkers(lightPoints, '{c_light}', 'light', '{lab_light}');
+                    addMarkers(moderatePoints, '{c_moderate}', 'moderate', '{lab_moderate}');
+                    addMarkers(heavyPoints, '{c_heavy}', 'heavy', '{lab_heavy}');
+                }});
                     function toggleLegend() {{
                         var content = document.getElementById('legendContent');
                         var toggle = document.getElementById('legendToggle');
@@ -2588,16 +2617,12 @@ else:
                             pass
 
                     if max(pred_df['预测流量']) > 200:
-                        fig_pred.add_hline(y=CONGESTION["light"]["min"], line_dash="dash", line_color="#ffc107",
-                                           annotation_text=CONGESTION["light"]["label"],
-                                           annotation_position="top right")
-                        fig_pred.add_hline(y=CONGESTION["moderate"]["min"], line_dash="dash", line_color="#fd7e14",
-                                           annotation_text=CONGESTION["moderate"]["label"],
-                                           annotation_position="top right")
-                        fig_pred.add_hline(y=CONGESTION["heavy"]["min"], line_color="#dc3545", line_dash="dash",
-                                           annotation_text=CONGESTION["heavy"]["label"],
-                                           annotation_position="top right")
-
+                        fig_pred.add_hline(y=adaptive_light_min, line_dash="dash", line_color="#ffc107",
+                                           annotation_text="轻度拥堵")
+                        fig_pred.add_hline(y=adaptive_moderate_min, line_dash="dash", line_color="#fd7e14",
+                                           annotation_text="中度拥堵")
+                        fig_pred.add_hline(y=adaptive_heavy_min, line_color="#dc3545", line_dash="dash",
+                                           annotation_text="严重拥堵")
                     fig_pred.update_layout(
                         height=400,
                         title=f"{predict_channel} 未来{predict_value}{'小时' if predict_mode == 'hour' else '天'}流量预测（含天气影响）",
@@ -2614,12 +2639,14 @@ else:
                     # ========== 天气影响分析图表（完整版） ==========
                     # ========== 天气对通航流量的影响分析（和截图布局完全一致：左右两列散点） ==========
                     # ========== 天气影响分析图表（使用历史数据） ==========
+                    # ========== 天气影响分析图表（修复版） ==========
                     if weather_df is not None and not weather_df.empty:
                         st.markdown("---")
                         st.subheader("🌤️ 天气对通航流量的影响分析（历史数据）")
 
-                        # 使用已经合并了天气的历史数据
-                        df_with_weather = df.copy()  # df 已经通过 merge_weather_data 合并了天气
+                        # ✅关键修复：每次绘图实时重新合并流量与天气，规避刷新丢失字段
+                        df_raw = st.session_state.df.copy()
+                        df_with_weather = merge_weather_data(df_raw, weather_df)
 
                         col_scatter1, col_scatter2 = st.columns(2)
 
@@ -2660,6 +2687,10 @@ else:
                                         yaxis_title="流量(艘/小时)"
                                     )
                                     st.plotly_chart(fig_wind, use_container_width=True)
+                                else:
+                                    st.info("风速与流量无匹配有效数据")
+                            else:
+                                st.warning("合并后数据内未找到【风速】字段")
 
                         # 右列：历史能见度 vs 历史流量
                         with col_scatter2:
@@ -2696,10 +2727,13 @@ else:
                                         yaxis_title="流量(艘/小时)"
                                     )
                                     st.plotly_chart(fig_vis, use_container_width=True)
-
+                                else:
+                                    st.info("能见度与流量无匹配有效数据")
+                            else:
+                                st.warning("合并后数据内未找到【能见度】字段")
                         st.markdown("---")
 
-                        # 不同天气平均流量（也用历史数据）
+                        # 🌈 不同天气平均通航流量（历史）
                         weather_col = None
                         for col in ['weather_x', 'weather', '天气', 'condition']:
                             if col in df_with_weather.columns:
@@ -2789,25 +2823,35 @@ else:
                             for idx, d in enumerate(pred_df['时间'].dt.date.unique()):
                                 day_data = pred_df[pred_df['时间'].dt.date == d].sort_values('小时')
                                 st.markdown(f"**{d}**")
+                                # 读取会话缓存自适应拥堵分界阈值
+                                light_t = st.session_state.adaptive_light_min
+                                mid_t = st.session_state.adaptive_moderate_min
+                                heavy_t = st.session_state.adaptive_heavy_min
+
                                 colors = []
                                 for x in day_data['预测流量']:
-                                    if x <= CONGESTION["normal"]["max"]:
-                                        colors.append(CONGESTION["normal"]["color"])
-                                    elif x <= CONGESTION["light"]["max"]:
-                                        colors.append(CONGESTION["light"]["color"])  # ✅ 使用 #FFA500
-                                    elif x <= CONGESTION["moderate"]["max"]:
-                                        colors.append(CONGESTION["moderate"]["color"])  # ✅ 使用 #FF0000
+                                    if x < light_t:
+                                        colors.append("#00CC00")  # 正常通行：绿色
+                                    elif light_t <= x < mid_t:
+                                        colors.append("#3690e8")  # 轻度拥堵：蓝色
+                                    elif mid_t <= x < heavy_t:
+                                        colors.append("#FFA500")  # 中度拥堵：橙色
                                     else:
-                                        colors.append(CONGESTION["heavy"]["color"])
+                                        colors.append("#ff0000")  # 严重拥堵：红色
+
 
 
                                 fig = go.Bar(x=day_data['小时'], y=day_data['预测流量'], marker_color=colors,
                                              text=day_data['预测流量'].round(0))
                                 fig = go.Figure(fig)
                                 if max(day_data['预测流量']) > 200:
-                                    fig.add_hline(CONGESTION["light"]["min"], line_dash="dash", line_color="#ffc107")
-                                    fig.add_hline(CONGESTION["moderate"]["min"], line_dash="dash", line_color="#fd7e14")
-                                    fig.add_hline(CONGESTION["heavy"]["min"], line_dash="dash", line_color="#dc3545")
+
+                                    fig.add_hline(y=adaptive_light_min, line_dash="dash", line_color="#ffc107",
+                                                  annotation_text="轻度拥堵")
+                                    fig.add_hline(y=adaptive_moderate_min, line_dash="dash", line_color="#fd7e14",
+                                                  annotation_text="中度拥堵")
+                                    fig.add_hline(y=adaptive_heavy_min, line_color="#dc3545", line_dash="dash",
+                                                  annotation_text="严重拥堵")
                                 fig.update_layout(
                                     height=300,
                                     xaxis_title="小时",
@@ -2821,11 +2865,12 @@ else:
                         st.markdown("---")
                         st.markdown("### 📋 全时段通行明细")
                         tab1, tab2, tab3, tab4 = st.tabs(["✅ 正常", "🔷 轻度", "⚠️ 中度", "🔴 严重"])
-                        for tab, level in zip([tab1, tab2, tab3, tab4],
-                                              [CONGESTION["normal"]["label"], CONGESTION["light"]["label"],
-                                               CONGESTION["moderate"]["label"], CONGESTION["heavy"]["label"]]):
+                        # 固定拥堵等级文本，与判定函数输出完全一致
+                        level_list = ["正常通行", "轻度拥堵", "中度拥堵", "严重拥堵"]
+                        for tab, level in zip([tab1, tab2, tab3, tab4], level_list):
                             with tab:
                                 sub = pred_df[pred_df["拥堵等级"] == level].copy()
+
                                 if len(sub) == 0:
                                     st.info(f"无{level}时段")
                                 else:
@@ -2882,7 +2927,7 @@ else:
                             x=compare_df["小时"],
                             y=compare_df["历史流量"],
                             mode='lines+markers',
-                            line=dict(color='#5470c6', width=3),
+                            line=dict(color='#3690e8', width=3),
                             marker=dict(size=8),
                             name='历史真实（全时段同小时均值）'
                         ))
@@ -3007,7 +3052,11 @@ else:
                         st.stop()
                     hist_df = hist_df.sort_values('time')
                     history_flow = hist_df['traffic_flow'].tolist()
-
+                    # 获取当前预测航道的自适应阈值（新增这段，解决变量未定义）
+                    # 全局统一固定分级标准
+                    adaptive_light_min = 200
+                    adaptive_moderate_min = 300
+                    adaptive_heavy_min = 400
                     selected_hist = df[df["channel_id"] == predict_channel].copy()
                     if len(selected_hist) >= 2:
                         time_diff = selected_hist["time"].max() - selected_hist["time"].min()
@@ -3073,20 +3122,30 @@ else:
                         "小时": hours,
                         "星期": [week_map[d.weekday()] for d in dates],
                     })
+                    # 读取当前航道自适应阈值，全程统一判定标准
+                    adaptive_light = adaptive_light_min
+                    adaptive_moderate = adaptive_moderate_min
+                    adaptive_heavy = adaptive_heavy_min
+
+                    # 读取当前航道自适应分界
+                    adaptive_light = adaptive_light_min
+                    adaptive_moderate = adaptive_moderate_min
+                    adaptive_heavy = adaptive_heavy_min
 
 
                     def get_congestion_level(flow):
-                        if flow <= CONGESTION["normal"]["max"]:
-                            return CONGESTION["normal"]["label"]
-                        elif flow <= CONGESTION["light"]["max"]:
-                            return CONGESTION["light"]["label"]
-                        elif flow <= CONGESTION["moderate"]["max"]:
-                            return CONGESTION["moderate"]["label"]
+                        if flow < adaptive_light:
+                            return "正常通行"
+                        elif adaptive_light <= flow < adaptive_moderate:
+                            return "轻度拥堵"
+                        elif adaptive_moderate <= flow < adaptive_heavy:
+                            return "中度拥堵"
                         else:
-                            return CONGESTION["heavy"]["label"]
+                            return "严重拥堵"
 
 
                     pred_df['拥堵等级'] = pred_df['预测流量'].apply(get_congestion_level)
+
                     pred_df['显示时间'] = pred_df['时间'].dt.strftime('%Y-%m-%d %H:%M')
                     pred_df['time_str'] = pred_df['小时'].apply(lambda h: f"{h:02d}:00")
 
@@ -3119,10 +3178,13 @@ else:
                         st.success(f"✅ 天气数据合并成功，已识别：{list(rename_map.values())}")
 
                     # 计算该航道的自适应阈值
-                    adaptive_thresholds = calculate_adaptive_thresholds(history_flow, predict_channel)
-                    adaptive_light_min = adaptive_thresholds["light"]
-                    adaptive_moderate_min = adaptive_thresholds["moderate"]
-                    adaptive_heavy_min = adaptive_thresholds["heavy"]
+                    # 全局统一固定分级标准，和地图完全对齐
+                    # 统一使用自适应阈值，和侧边栏拥堵分级标准完全一致
+                    selected_channel_hist = df[df['channel_id'] == predict_channel]['traffic_flow'].tolist()
+                    thresholds = calculate_adaptive_thresholds(selected_channel_hist, predict_channel)
+                    adaptive_light_min = thresholds["light"]
+                    adaptive_moderate_min = thresholds["moderate"]
+                    adaptive_heavy_min = thresholds["heavy"]
 
                     # 使用自适应阈值进行统计
                     normal = len(pred_df[pred_df["预测流量"] < adaptive_light_min])
