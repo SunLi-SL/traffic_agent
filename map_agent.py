@@ -1780,42 +1780,64 @@ else:
                 st.metric("💧 平均湿度", f"{avg_hum:.0f} %")
             else:
                 st.metric("💧 平均湿度", "无数据")
+        import matplotlib.pyplot as plt
+        from matplotlib.font_manager import FontProperties
+        import os
+
+        font_file = os.path.join(os.path.dirname(__file__), "SourceHanSansSC-Regular-2.otf")
+        zh_font = FontProperties(fname=font_file)
 
         with st.expander("📈 气象指标变化趋势", expanded=True):
-            fig, axes = plt.subplots(3, 1, figsize=(8, 5), sharex=True)
+            fig, axes = plt.subplots(3, 1, figsize=(10, 6.5), sharex=True)
 
+            # 气温子图
             if "temperature" in weather_df.columns:
-                axes[0].plot(weather_df["time"], weather_df["temperature"], color="#ff4b4b", linewidth=2)
-                axes[0].set_ylabel("气温 (℃)", fontsize=10)
-                axes[0].set_title("气温变化", fontsize=12)
-                axes[0].grid(True, alpha=0.3)
+                axes[0].plot(weather_df["time"], weather_df["temperature"], color="#ff4b4b", linewidth=2.6)
+                axes[0].set_title("气温变化", loc="center", fontsize=11, fontproperties=zh_font)
+                axes[0].set_ylabel("气温 (℃)", fontsize=10, fontproperties=zh_font)
+                axes[0].grid(True, alpha=0.3, color="#dddddd")
+                axes[0].spines["top"].set_color("black")
+                axes[0].spines["right"].set_color("black")
+                axes[0].spines["bottom"].set_color("black")
+                axes[0].spines["left"].set_color("black")
+                for tick in axes[0].get_xticklabels() + axes[0].get_yticklabels():
+                    tick.set_fontproperties(zh_font)
             else:
-                axes[0].text(0.5, 0.5, "暂无气温数据", ha='center', va='center', transform=axes[0].transAxes)
-                axes[0].set_ylabel("气温 (℃)")
+                axes[0].text(0.5, 0.5, "暂无气温数据", ha='center', va='center', transform=axes[0].transAxes,
+                             fontproperties=zh_font)
 
+            # 风速子图
             if "wind_speed" in weather_df.columns:
-                axes[1].plot(weather_df["time"], weather_df["wind_speed"], color="#1f77b4", linewidth=2)
-                axes[1].set_ylabel("风速 (m/s)", fontsize=10)
-                axes[1].set_title("风速变化", fontsize=12)
-                axes[1].grid(True, alpha=0.3)
-            else:
-                axes[1].text(0.5, 0.5, "暂无风速数据", ha='center', va='center', transform=axes[1].transAxes)
-                axes[1].set_ylabel("风速 (m/s)")
+                axes[1].plot(weather_df["time"], weather_df["wind_speed"], color="#1f77b4", linewidth=2.6)
+                axes[1].set_title("风速变化", loc="center", fontsize=11, fontproperties=zh_font)
+                axes[1].set_ylabel("风速 (m/s)", fontsize=10, fontproperties=zh_font)
+                axes[1].grid(True, alpha=0.3, color="#dddddd")
+                axes[1].spines["top"].set_color("black")
+                axes[1].spines["right"].set_color("black")
+                axes[1].spines["bottom"].set_color("black")
+                axes[1].spines["left"].set_color("black")
+                for tick in axes[1].get_xticklabels() + axes[1].get_yticklabels():
+                    tick.set_fontproperties(zh_font)
 
+            # 能见度子图
             if "visibility" in weather_df.columns:
-                axes[2].plot(weather_df["time"], weather_df["visibility"], color="#2ca02c", linewidth=2)
-                axes[2].set_ylabel("能见度 (m)", fontsize=10)
-                axes[2].set_title("能见度变化", fontsize=12)
-                axes[2].grid(True, alpha=0.3)
-            else:
-                axes[2].text(0.5, 0.5, "暂无能见度数据", ha='center', va='center', transform=axes[2].transAxes)
-                axes[2].set_ylabel("能见度 (m)")
+                axes[2].plot(weather_df["time"], weather_df["visibility"], color="#2ca02c", linewidth=2.6)
+                axes[2].set_title("能见度变化", loc="center", fontsize=11, fontproperties=zh_font)
+                axes[2].set_ylabel("能见度 (m)", fontsize=10, fontproperties=zh_font)
+                axes[2].set_xlabel("时间", fontsize=10, fontproperties=zh_font)
+                axes[2].grid(True, alpha=0.3, color="#dddddd")
+                axes[2].spines["top"].set_color("black")
+                axes[2].spines["right"].set_color("black")
+                axes[2].spines["bottom"].set_color("black")
+                axes[2].spines["left"].set_color("black")
+                for tick in axes[2].get_xticklabels() + axes[2].get_yticklabels():
+                    tick.set_fontproperties(zh_font)
 
-            axes[2].set_xlabel("时间", fontsize=10)
-            axes[2].xaxis.set_major_locator(plt.MaxNLocator(6))
             plt.xticks(rotation=0, fontsize=9)
             plt.tight_layout()
             st.pyplot(fig)
+
+
 
         # 降水量趋势
         if "precipitation" in weather_df.columns:
