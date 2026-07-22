@@ -85,10 +85,18 @@ alt.data_transformers.disable_max_rows()
 week_map = {0: "星期一", 1: "星期二", 2: "星期三", 3: "星期四", 4: "星期五", 5: "星期六", 6: "星期日"}
 
 
-# 解决中文显示
-plt.rcParams["font.sans-serif"] = ["SimHei", "DejaVu Sans"]
-plt.rcParams["axes.unicode_minus"] = False
+# 兼容 Windows本地 + Linux云端（Streamlit Cloud）
+import matplotlib.pyplot as plt
+import platform
 
+# 判断系统适配字体
+if platform.system() == "Windows":
+    plt.rcParams["font.sans-serif"] = ["SimHei", "DejaVu Sans"]
+else:
+    # Linux云端环境通用开源中文字体（Streamlit Cloud内置）
+    plt.rcParams["font.sans-serif"] = ["WenQuanYi Zen Hei"]
+
+plt.rcParams["axes.unicode_minus"] = False
 # -------------------------- 大模型配置 --------------------------
 def get_api_key():
     # 优先读取顶部全局变量（云端secrets [api]分组已经加载好）
